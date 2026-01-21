@@ -31,6 +31,14 @@ variable "global_secondary_indexes" {
     read_capacity      = optional(string, null)
     write_capacity     = optional(string, null)
     non_key_attributes = optional(list(string), null)
+    on_demand_throughput = optional(object({
+      max_read_request_units  = optional(number, null)
+      max_write_request_units = optional(number, null)
+    }), null)
+    warm_throughput = optional(object({
+      read_units_per_second  = optional(number, null)
+      write_units_per_second = optional(number, null)
+    }), null)
   }))
   default = []
 }
@@ -67,6 +75,17 @@ variable "point_in_time_recovery_enabled" {
   default     = true
 }
 
+variable "point_in_time_recovery_period_in_days" {
+  description = "The recovery period in days for point-in-time recovery. Must be between 1 and 35. Default is 35."
+  type        = number
+  default     = 35
+
+  validation {
+    condition     = var.point_in_time_recovery_period_in_days >= 1 && var.point_in_time_recovery_period_in_days <= 35
+    error_message = "The point_in_time_recovery_period_in_days must be between 1 and 35 days."
+  }
+}
+
 
 variable "range_key" {
   description = "The attribute to use as the range (sort) key. Must also be defined as an attribute"
@@ -83,12 +102,23 @@ variable "read_capacity" {
 variable "replica_regions" {
   description = "Region names for creating replicas for a global DynamoDB table including parameters."
   type = list(object({
-    region_name            = string
-    kms_key_arn            = optional(string, null)
-    propagate_tags         = optional(bool, null)
-    point_in_time_recovery = optional(bool, null)
+    region_name                 = string
+    kms_key_arn                 = optional(string, null)
+    propagate_tags              = optional(bool, null)
+    point_in_time_recovery      = optional(bool, null)
+    consistency_mode            = optional(string, null)
+    deletion_protection_enabled = optional(bool, null)
   }))
   default = []
+
+  validation {
+    condition = alltrue([
+      for replica in var.replica_regions :
+      replica.consistency_mode == null ||
+      contains(["STRONG", "EVENTUAL"], replica.consistency_mode)
+    ])
+    error_message = "consistency_mode must be either 'STRONG' or 'EVENTUAL'."
+  }
 }
 
 variable "stream_enabled" {
@@ -113,6 +143,24 @@ variable "table_class" {
   description = "The storage class of the table. Valid values are STANDARD and STANDARD_INFREQUENT_ACCESS"
   type        = string
   default     = null
+}
+
+variable "table_on_demand_throughput" {
+  description = "Sets the maximum number of read and write units for when the table is in on-demand mode. Set to -1 to remove the cap."
+  type = object({
+    max_read_request_units  = optional(number, null)
+    max_write_request_units = optional(number, null)
+  })
+  default = null
+}
+
+variable "table_warm_throughput" {
+  description = "Sets the warm throughput for the table. Minimum values are read_units_per_second: 12000, write_units_per_second: 4000."
+  type = object({
+    read_units_per_second  = optional(number, null)
+    write_units_per_second = optional(number, null)
+  })
+  default = null
 }
 
 variable "ttl_attribute_name" {
