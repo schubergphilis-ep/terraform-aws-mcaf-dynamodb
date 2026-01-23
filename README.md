@@ -16,7 +16,7 @@ IMPORTANT: We do not pin modules to versions in our examples. We highly recommen
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 6.13.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.28.0 |
 
 ## Modules
 
@@ -61,8 +61,11 @@ No modules.
 
 | Name | Description |
 |------|-------------|
-| <a name="output_arn"></a> [arn](#output\_arn) | ARN of the DynamoDB table |
-| <a name="output_id"></a> [id](#output\_id) | ID of the DynamoDB table |
+| <a name="output_arn"></a> [arn](#output\_arn) | ARN of the DynamoDB table. |
+| <a name="output_id"></a> [id](#output\_id) | ID of the DynamoDB table. |
+| <a name="output_name"></a> [name](#output\_name) | Name of the DynamoDB table. |
+| <a name="output_stream_arn"></a> [stream\_arn](#output\_stream\_arn) | ARN of the DynamoDB table stream (empty if streams are disabled). |
+| <a name="output_stream_label"></a> [stream\_label](#output\_stream\_label) | Timestamp label of the DynamoDB table stream (empty if streams are disabled). |
 <!-- END_TF_DOCS -->
 
 ## Licensing

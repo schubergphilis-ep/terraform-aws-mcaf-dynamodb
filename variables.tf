@@ -1,60 +1,103 @@
-variable "attributes" {
-  description = "List of nested attribute definitions. Only required for hash_key and range_key attributes. Each attribute has two properties: name - (Required) The name of the attribute, type - (Required) Attribute type, which must be a scalar type: S, N, or B for (S)tring, (N)umber or (B)inary data."
-  type        = list(map(string))
-}
+############################################
+# Table identity & keys
+############################################
 
-variable "billing_mode" {
-  description = "Controls how you are billed for read/write throughput and how you manage capacity. The valid values are PROVISIONED or PAY_PER_REQUEST."
+variable "name" {
+  description = "DynamoDB table name."
   type        = string
-  default     = "PAY_PER_REQUEST"
-}
-
-variable "deletion_protection_enabled" {
-  description = "Enables deletion protection for the table."
-  type        = bool
-  default     = true
-}
-
-variable "enable_dynamodb_insights" {
-  description = "Set to true to enable CloudWatch contributor insights for DynamoDB"
-  type        = bool
-  default     = false
-}
-
-variable "global_secondary_indexes" {
-  description = "Describe a GSI for the table; subject to the normal limits on the number of GSIs, projected attributes, etc."
-  type = list(object({
-    name               = string
-    hash_key           = string
-    projection_type    = string
-    range_key          = optional(string, null)
-    read_capacity      = optional(string, null)
-    write_capacity     = optional(string, null)
-    non_key_attributes = optional(list(string), null)
-    on_demand_throughput = optional(object({
-      max_read_request_units  = optional(number, null)
-      max_write_request_units = optional(number, null)
-    }), null)
-    warm_throughput = optional(object({
-      read_units_per_second  = optional(number, null)
-      write_units_per_second = optional(number, null)
-    }), null)
-  }))
-  default = []
 }
 
 variable "hash_key" {
-  description = "The attribute to use as the hash (partition) key. Must also be defined as an attribute"
+  description = "Partition (hash) key attribute name. Must be defined in `attributes`."
   type        = string
 }
 
-variable "kms_key_arn" {
-  description = "The ARN of the KMS key to use; if set to `null` the `aws/dynamodb` AWS-managed key will be used"
+variable "range_key" {
+  description = "Sort (range) key attribute name (optional). Must be defined in `attributes` when set."
   type        = string
+  default     = null
 }
+
+variable "attributes" {
+  description = <<-EOT
+  Attribute definitions for table keys and index keys (provider constraint: only key/index attributes may be declared).
+  Each item must include: `name` and `type` (S, N, or B).
+
+  Note: TTL attribute must NOT be declared here unless it is used as a key in an index.
+  EOT
+  type = list(object({
+    name = string
+    type = string
+  }))
+
+  validation {
+    condition     = alltrue([for a in var.attributes : contains(["S", "N", "B"], a.type)])
+    error_message = "attributes[*].type must be one of: S, N, B."
+  }
+}
+
+############################################
+# Billing & throughput
+############################################
+
+variable "billing_mode" {
+  description = "Billing mode: PROVISIONED or PAY_PER_REQUEST."
+  type        = string
+  default     = "PAY_PER_REQUEST"
+
+  validation {
+    condition     = contains(["PROVISIONED", "PAY_PER_REQUEST"], var.billing_mode)
+    error_message = "billing_mode must be PROVISIONED or PAY_PER_REQUEST."
+  }
+}
+
+variable "read_capacity" {
+  description = "Read capacity units (RCU) when billing_mode is PROVISIONED."
+  type        = number
+  default     = null
+}
+
+variable "write_capacity" {
+  description = "Write capacity units (WCU) when billing_mode is PROVISIONED."
+  type        = number
+  default     = null
+}
+
+variable "table_class" {
+  description = "Table class: STANDARD or STANDARD_INFREQUENT_ACCESS."
+  type        = string
+  default     = "STANDARD"
+
+  validation {
+    condition     = contains(["STANDARD", "STANDARD_INFREQUENT_ACCESS"], var.table_class)
+    error_message = "table_class must be STANDARD or STANDARD_INFREQUENT_ACCESS."
+  }
+}
+
+variable "table_on_demand_throughput" {
+  description = "Optional caps for on-demand mode. Set -1 to remove the cap (module/provider semantics dependent)."
+  type = object({
+    max_read_request_units  = optional(number, null)
+    max_write_request_units = optional(number, null)
+  })
+  default = null
+}
+
+variable "table_warm_throughput" {
+  description = "Optional warm throughput settings (if supported)."
+  type = object({
+    read_units_per_second  = optional(number, null)
+    write_units_per_second = optional(number, null)
+  })
+  default = null
+}
+
+############################################
+# Indexes
+############################################
 
 variable "local_secondary_indexes" {
-  description = "Describe a LSI on the table; these can only be allocated at creation so you cannot change this definition after you have created the resource."
+  description = "Local secondary indexes (LSIs). Only settable at table creation time."
   type = list(object({
     name               = string
     range_key          = string
@@ -64,43 +107,78 @@ variable "local_secondary_indexes" {
   default = []
 }
 
-variable "name" {
-  description = "Name of the DynamoDB table"
-  type        = string
+variable "global_secondary_indexes" {
+  description = "Global secondary indexes (GSIs)."
+  type = list(object({
+    name               = string
+    hash_key           = string
+    projection_type    = string
+    range_key          = optional(string, null)
+
+    read_capacity      = optional(number, null)
+    write_capacity     = optional(number, null)
+
+    non_key_attributes = optional(list(string), null)
+
+    on_demand_throughput = optional(object({
+      max_read_request_units  = optional(number, null)
+      max_write_request_units = optional(number, null)
+    }), null)
+
+    warm_throughput = optional(object({
+      read_units_per_second  = optional(number, null)
+      write_units_per_second = optional(number, null)
+    }), null)
+  }))
+  default = []
 }
 
-variable "point_in_time_recovery_enabled" {
-  description = "Set to true to enable point-in-time recovery"
+############################################
+# Streams
+############################################
+
+variable "stream_enabled" {
+  description = "Enable DynamoDB Streams."
   type        = bool
-  default     = true
+  default     = false
 }
 
-variable "point_in_time_recovery_period_in_days" {
-  description = "The recovery period in days for point-in-time recovery. Must be between 1 and 35. Default is 35."
-  type        = number
-  default     = 35
+variable "stream_view_type" {
+  description = "Stream view type when streams are enabled: KEYS_ONLY, NEW_IMAGE, OLD_IMAGE, NEW_AND_OLD_IMAGES."
+  type        = string
+  default     = null
 
   validation {
-    condition     = var.point_in_time_recovery_period_in_days >= 1 && var.point_in_time_recovery_period_in_days <= 35
-    error_message = "The point_in_time_recovery_period_in_days must be between 1 and 35 days."
+    condition = (
+      var.stream_view_type == null ||
+      contains(["KEYS_ONLY", "NEW_IMAGE", "OLD_IMAGE", "NEW_AND_OLD_IMAGES"], var.stream_view_type)
+    )
+    error_message = "stream_view_type must be one of: KEYS_ONLY, NEW_IMAGE, OLD_IMAGE, NEW_AND_OLD_IMAGES."
   }
 }
 
+############################################
+# TTL
+############################################
 
-variable "range_key" {
-  description = "The attribute to use as the range (sort) key. Must also be defined as an attribute"
+variable "ttl_enabled" {
+  description = "Enable Time To Live (TTL)."
+  type        = bool
+  default     = false
+}
+
+variable "ttl_attribute_name" {
+  description = "TTL attribute name (Unix epoch time in seconds). Used only when ttl_enabled is true."
   type        = string
-  default     = null
+  default     = "ttl"
 }
 
-variable "read_capacity" {
-  description = "The number of read units for this table. If the billing_mode is PROVISIONED, this field should be greater than 0"
-  type        = number
-  default     = null
-}
+############################################
+# Replication (Global Tables)
+############################################
 
 variable "replica_regions" {
-  description = "Region names for creating replicas for a global DynamoDB table including parameters."
+  description = "Replica regions configuration for global tables."
   type = list(object({
     region_name                 = string
     kms_key_arn                 = optional(string, null)
@@ -113,70 +191,62 @@ variable "replica_regions" {
 
   validation {
     condition = alltrue([
-      for replica in var.replica_regions :
-      replica.consistency_mode == null ||
-      contains(["STRONG", "EVENTUAL"], replica.consistency_mode)
+      for r in var.replica_regions :
+      r.consistency_mode == null || contains(["STRONG", "EVENTUAL"], r.consistency_mode)
     ])
-    error_message = "consistency_mode must be either 'STRONG' or 'EVENTUAL'."
+    error_message = "replica_regions[*].consistency_mode must be STRONG or EVENTUAL when set."
   }
 }
 
-variable "stream_enabled" {
-  description = "Set to true to enable streams"
+############################################
+# Durability & protection
+############################################
+
+variable "point_in_time_recovery_enabled" {
+  description = "Enable point-in-time recovery (PITR)."
+  type        = bool
+  default     = true
+}
+
+variable "point_in_time_recovery_period_in_days" {
+  description = "PITR recovery period in days (1..35)."
+  type        = number
+  default     = 35
+
+  validation {
+    condition     = var.point_in_time_recovery_period_in_days >= 1 && var.point_in_time_recovery_period_in_days <= 35
+    error_message = "point_in_time_recovery_period_in_days must be between 1 and 35."
+  }
+}
+
+variable "deletion_protection_enabled" {
+  description = "Enable deletion protection."
+  type        = bool
+  default     = true
+}
+
+############################################
+# Observability
+############################################
+
+variable "enable_dynamodb_insights" {
+  description = "Enable DynamoDB Contributor Insights."
   type        = bool
   default     = false
 }
 
-variable "stream_view_type" {
-  description = "When an item in the table is modified, StreamViewType determines what information is written to the table's stream. Valid values are KEYS_ONLY, NEW_IMAGE, OLD_IMAGE, NEW_AND_OLD_IMAGES."
+############################################
+# Encryption & tags
+############################################
+
+variable "kms_key_arn" {
+  description = "KMS key ARN for server-side encryption. When null, AWS-managed key (aws/dynamodb) is used."
   type        = string
   default     = null
 }
 
 variable "tags" {
-  description = "A map of tags to add to all resources"
+  description = "Tags applied to all resources."
   type        = map(string)
   default     = {}
-}
-
-variable "table_class" {
-  description = "The storage class of the table. Valid values are STANDARD and STANDARD_INFREQUENT_ACCESS"
-  type        = string
-  default     = null
-}
-
-variable "table_on_demand_throughput" {
-  description = "Sets the maximum number of read and write units for when the table is in on-demand mode. Set to -1 to remove the cap."
-  type = object({
-    max_read_request_units  = optional(number, null)
-    max_write_request_units = optional(number, null)
-  })
-  default = null
-}
-
-variable "table_warm_throughput" {
-  description = "Sets the warm throughput for the table. Minimum values are read_units_per_second: 12000, write_units_per_second: 4000."
-  type = object({
-    read_units_per_second  = optional(number, null)
-    write_units_per_second = optional(number, null)
-  })
-  default = null
-}
-
-variable "ttl_attribute_name" {
-  description = "The name of the table attribute to store the TTL timestamp in"
-  type        = string
-  default     = ""
-}
-
-variable "ttl_enabled" {
-  description = "Indicates whether ttl is enabled"
-  type        = bool
-  default     = false
-}
-
-variable "write_capacity" {
-  description = "The number of write units for this table. If the billing_mode is PROVISIONED, this field should be greater than 0"
-  type        = number
-  default     = null
 }
