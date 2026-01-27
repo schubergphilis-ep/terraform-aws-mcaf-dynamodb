@@ -11,7 +11,8 @@ resource "aws_dynamodb_table" "table" {
   write_capacity              = var.write_capacity
 
   point_in_time_recovery {
-    enabled = var.point_in_time_recovery_enabled
+    enabled                 = var.point_in_time_recovery_enabled
+    recovery_period_in_days = var.point_in_time_recovery_period_in_days
   }
 
   server_side_encryption {
@@ -22,6 +23,24 @@ resource "aws_dynamodb_table" "table" {
   ttl {
     enabled        = var.ttl_enabled
     attribute_name = var.ttl_attribute_name
+  }
+
+  dynamic "on_demand_throughput" {
+    for_each = var.table_on_demand_throughput != null ? [var.table_on_demand_throughput] : []
+
+    content {
+      max_read_request_units  = on_demand_throughput.value.max_read_request_units
+      max_write_request_units = on_demand_throughput.value.max_write_request_units
+    }
+  }
+
+  dynamic "warm_throughput" {
+    for_each = var.table_warm_throughput != null ? [var.table_warm_throughput] : []
+
+    content {
+      read_units_per_second  = warm_throughput.value.read_units_per_second
+      write_units_per_second = warm_throughput.value.write_units_per_second
+    }
   }
 
   dynamic "attribute" {
@@ -55,6 +74,24 @@ resource "aws_dynamodb_table" "table" {
       read_capacity      = lookup(global_secondary_index.value, "read_capacity", null)
       write_capacity     = lookup(global_secondary_index.value, "write_capacity", null)
       non_key_attributes = lookup(global_secondary_index.value, "non_key_attributes", null)
+
+      dynamic "on_demand_throughput" {
+        for_each = lookup(global_secondary_index.value, "on_demand_throughput", null) != null ? [global_secondary_index.value.on_demand_throughput] : []
+
+        content {
+          max_read_request_units  = on_demand_throughput.value.max_read_request_units
+          max_write_request_units = on_demand_throughput.value.max_write_request_units
+        }
+      }
+
+      dynamic "warm_throughput" {
+        for_each = lookup(global_secondary_index.value, "warm_throughput", null) != null ? [global_secondary_index.value.warm_throughput] : []
+
+        content {
+          read_units_per_second  = warm_throughput.value.read_units_per_second
+          write_units_per_second = warm_throughput.value.write_units_per_second
+        }
+      }
     }
   }
 
@@ -62,10 +99,12 @@ resource "aws_dynamodb_table" "table" {
     for_each = var.replica_regions
 
     content {
-      region_name            = replica.value.region_name
-      kms_key_arn            = lookup(replica.value, "kms_key_arn", null)
-      propagate_tags         = lookup(replica.value, "propagate_tags", null)
-      point_in_time_recovery = lookup(replica.value, "point_in_time_recovery", null)
+      region_name                 = replica.value.region_name
+      kms_key_arn                 = lookup(replica.value, "kms_key_arn", null)
+      propagate_tags              = lookup(replica.value, "propagate_tags", null)
+      point_in_time_recovery      = lookup(replica.value, "point_in_time_recovery", null)
+      consistency_mode            = lookup(replica.value, "consistency_mode", null)
+      deletion_protection_enabled = lookup(replica.value, "deletion_protection_enabled", null)
     }
   }
 
@@ -80,5 +119,7 @@ resource "aws_dynamodb_table" "table" {
 resource "aws_dynamodb_contributor_insights" "table_insight" {
   count = var.enable_dynamodb_insights ? 1 : 0
 
-  table_name = var.name
+  table_name = aws_dynamodb_table.table.name
+
+  depends_on = [aws_dynamodb_table.table]
 }
