@@ -110,13 +110,13 @@ variable "local_secondary_indexes" {
 variable "global_secondary_indexes" {
   description = "Global secondary indexes (GSIs)."
   type = list(object({
-    name               = string
-    hash_key           = string
-    projection_type    = string
-    range_key          = optional(string, null)
+    name            = string
+    hash_key        = string
+    projection_type = string
+    range_key       = optional(string, null)
 
-    read_capacity      = optional(number, null)
-    write_capacity     = optional(number, null)
+    read_capacity  = optional(number, null)
+    write_capacity = optional(number, null)
 
     non_key_attributes = optional(list(string), null)
 
@@ -233,6 +233,12 @@ variable "enable_dynamodb_insights" {
   description = "Enable DynamoDB Contributor Insights."
   type        = bool
   default     = false
+}
+
+variable "enable_dynamodb_insights_gsis" {
+  type        = bool
+  default     = false
+  description = "Enable Contributor Insights on all GSIs."
 }
 
 ############################################

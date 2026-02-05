@@ -22,3 +22,8 @@ output "stream_label" {
   description = "Timestamp label of the DynamoDB table stream (empty if streams are disabled)."
   value       = try(aws_dynamodb_table.table.stream_label, "")
 }
+
+output "gsi_names" {
+  value       = [for g in var.global_secondary_indexes : g.name]
+  description = "List of GSI names."
+}

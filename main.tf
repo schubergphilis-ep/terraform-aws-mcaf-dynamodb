@@ -1,3 +1,25 @@
+locals {
+  attribute_names     = toset([for a in var.attributes : a.name])
+  attribute_name_list = [for a in var.attributes : a.name]
+
+  table_key_names = toset(compact([var.hash_key, var.range_key]))
+
+  gsi_key_names = toset(flatten([
+    for g in var.global_secondary_indexes :
+    compact([g.hash_key, try(g.range_key, null)])
+  ]))
+
+  lsi_key_names = toset([
+    for l in var.local_secondary_indexes : l.range_key
+  ])
+
+  all_key_names = setunion(local.table_key_names, local.gsi_key_names, local.lsi_key_names)
+
+  missing_key_attributes = setsubtract(local.all_key_names, local.attribute_names)
+}
+
+
+
 
 resource "aws_dynamodb_table" "table" {
   name                        = var.name
@@ -8,8 +30,8 @@ resource "aws_dynamodb_table" "table" {
   range_key = var.range_key
 
   # Only required when billing_mode == PROVISIONED
-  read_capacity  = var.read_capacity
-  write_capacity = var.write_capacity
+  read_capacity  = var.billing_mode == "PROVISIONED" ? var.read_capacity : null
+  write_capacity = var.billing_mode == "PROVISIONED" ? var.write_capacity : null
 
   stream_enabled   = var.stream_enabled
   stream_view_type = var.stream_view_type
@@ -18,7 +40,7 @@ resource "aws_dynamodb_table" "table" {
 
   point_in_time_recovery {
     enabled                 = var.point_in_time_recovery_enabled
-    recovery_period_in_days = var.point_in_time_recovery_period_in_days
+    recovery_period_in_days = var.point_in_time_recovery_enabled ? var.point_in_time_recovery_period_in_days : null
   }
 
   server_side_encryption {
@@ -26,9 +48,12 @@ resource "aws_dynamodb_table" "table" {
     kms_key_arn = var.kms_key_arn
   }
 
-  ttl {
-    enabled        = var.ttl_enabled
-    attribute_name = var.ttl_attribute_name
+  dynamic "ttl" {
+    for_each = var.ttl_enabled ? [1] : []
+    content {
+      enabled        = true
+      attribute_name = var.ttl_attribute_name
+    }
   }
 
   dynamic "on_demand_throughput" {
@@ -74,9 +99,9 @@ resource "aws_dynamodb_table" "table" {
       hash_key           = global_secondary_index.value.hash_key
       projection_type    = global_secondary_index.value.projection_type
       range_key          = lookup(global_secondary_index.value, "range_key", null)
-      read_capacity      = lookup(global_secondary_index.value, "read_capacity", null)
-      write_capacity     = lookup(global_secondary_index.value, "write_capacity", null)
       non_key_attributes = lookup(global_secondary_index.value, "non_key_attributes", null)
+      read_capacity      = var.billing_mode == "PROVISIONED" ? lookup(global_secondary_index.value, "read_capacity", null) : null
+      write_capacity     = var.billing_mode == "PROVISIONED" ? lookup(global_secondary_index.value, "write_capacity", null) : null
 
       dynamic "on_demand_throughput" {
         for_each = lookup(global_secondary_index.value, "on_demand_throughput", null) != null ? [global_secondary_index.value.on_demand_throughput] : []
@@ -144,6 +169,24 @@ resource "aws_dynamodb_table" "table" {
       )
       error_message = "read_capacity and write_capacity must be set when billing_mode is PROVISIONED."
     }
+
+    precondition {
+      condition     = length(local.missing_key_attributes) == 0
+      error_message = "Missing attribute definitions for keys/indexes: ${join(", ", tolist(local.missing_key_attributes))}. Add them to var.attributes."
+    }
+
+    precondition {
+      condition     = length(local.attribute_name_list) == length(toset(local.attribute_name_list))
+      error_message = "Duplicate attribute names found in var.attributes."
+    }
+
+    precondition {
+      condition = (
+        length(var.replica_regions) == 0
+        || (var.stream_enabled && var.stream_view_type == "NEW_AND_OLD_IMAGES")
+      )
+      error_message = "Global Tables (replica_regions) require stream_enabled = true and stream_view_type = 'NEW_AND_OLD_IMAGES'."
+    }
   }
 }
 
@@ -155,4 +198,13 @@ resource "aws_dynamodb_contributor_insights" "table_insight" {
 
   # Explicit dependency for clarity and future-proofing (redundant with the reference above).
   depends_on = [aws_dynamodb_table.table]
+}
+
+resource "aws_dynamodb_contributor_insights" "gsi_insights" {
+  for_each = var.enable_dynamodb_insights_gsis ? {
+    for g in var.global_secondary_indexes : g.name => g
+  } : {}
+
+  table_name = aws_dynamodb_table.table.name
+  index_name = each.key
 }
