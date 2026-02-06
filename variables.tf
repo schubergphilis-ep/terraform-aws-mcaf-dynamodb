@@ -256,3 +256,23 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+############################################
+# Autoscaling
+############################################
+
+variable "enable_autoscaling" {
+  description = "If true and billing_mode=PROVISIONED, ignores changes to RCU/WCU to allow external Auto Scaling to manage them."
+  type        = bool
+  default     = false
+}
+
+variable "autoscaling_ignores_gsis" {
+  description = <<-EOT
+  When enable_autoscaling=true, if this is true then the module ignores the entire global_secondary_index block to prevent
+  capacity thrash when GSIs are autoscaled externally. Trade-off: Terraform will not detect drift for GSI schema settings
+  (projection_type, keys, non_key_attributes, etc.) while enabled.
+  EOT
+  type        = bool
+  default     = true
+}

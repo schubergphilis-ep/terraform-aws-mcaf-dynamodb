@@ -28,15 +28,20 @@ No modules.
 |------|------|
 | [aws_dynamodb_contributor_insights.gsi_insights](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_contributor_insights) | resource |
 | [aws_dynamodb_contributor_insights.table_insight](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_contributor_insights) | resource |
-| [aws_dynamodb_table.table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
+| [aws_dynamodb_table.ondemand](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
+| [aws_dynamodb_table.provisioned_autoscaled_table_only](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
+| [aws_dynamodb_table.provisioned_autoscaled_with_gsis](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
+| [aws_dynamodb_table.provisioned_static](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_attributes"></a> [attributes](#input\_attributes) | Attribute definitions for table keys and index keys (provider constraint: only key/index attributes may be declared).<br/>Each item must include: `name` and `type` (S, N, or B).<br/><br/>Note: TTL attribute must NOT be declared here unless it is used as a key in an index. | <pre>list(object({<br/>    name = string<br/>    type = string<br/>  }))</pre> | n/a | yes |
+| <a name="input_autoscaling_ignores_gsis"></a> [autoscaling\_ignores\_gsis](#input\_autoscaling\_ignores\_gsis) | When enable\_autoscaling=true, if this is true then the module ignores the entire global\_secondary\_index block to prevent<br/>capacity thrash when GSIs are autoscaled externally. Trade-off: Terraform will not detect drift for GSI schema settings<br/>(projection\_type, keys, non\_key\_attributes, etc.) while enabled. | `bool` | `true` | no |
 | <a name="input_billing_mode"></a> [billing\_mode](#input\_billing\_mode) | Billing mode: PROVISIONED or PAY\_PER\_REQUEST. | `string` | `"PAY_PER_REQUEST"` | no |
 | <a name="input_deletion_protection_enabled"></a> [deletion\_protection\_enabled](#input\_deletion\_protection\_enabled) | Enable deletion protection. | `bool` | `true` | no |
+| <a name="input_enable_autoscaling"></a> [enable\_autoscaling](#input\_enable\_autoscaling) | If true and billing\_mode=PROVISIONED, ignores changes to RCU/WCU to allow external Auto Scaling to manage them. | `bool` | `false` | no |
 | <a name="input_enable_dynamodb_insights"></a> [enable\_dynamodb\_insights](#input\_enable\_dynamodb\_insights) | Enable DynamoDB Contributor Insights. | `bool` | `false` | no |
 | <a name="input_enable_dynamodb_insights_gsis"></a> [enable\_dynamodb\_insights\_gsis](#input\_enable\_dynamodb\_insights\_gsis) | Enable Contributor Insights on all GSIs. | `bool` | `false` | no |
 | <a name="input_global_secondary_indexes"></a> [global\_secondary\_indexes](#input\_global\_secondary\_indexes) | Global secondary indexes (GSIs). | <pre>list(object({<br/>    name            = string<br/>    hash_key        = string<br/>    projection_type = string<br/>    range_key       = optional(string, null)<br/><br/>    read_capacity  = optional(number, null)<br/>    write_capacity = optional(number, null)<br/><br/>    non_key_attributes = optional(list(string), null)<br/><br/>    on_demand_throughput = optional(object({<br/>      max_read_request_units  = optional(number, null)<br/>      max_write_request_units = optional(number, null)<br/>    }), null)<br/><br/>    warm_throughput = optional(object({<br/>      read_units_per_second  = optional(number, null)<br/>      write_units_per_second = optional(number, null)<br/>    }), null)<br/>  }))</pre> | `[]` | no |
