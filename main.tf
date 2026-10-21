@@ -96,12 +96,24 @@ resource "aws_dynamodb_table" "table" {
     for_each = var.global_secondary_indexes
     content {
       name               = global_secondary_index.value.name
-      hash_key           = global_secondary_index.value.hash_key
       projection_type    = global_secondary_index.value.projection_type
-      range_key          = lookup(global_secondary_index.value, "range_key", null)
       non_key_attributes = lookup(global_secondary_index.value, "non_key_attributes", null)
       read_capacity      = var.billing_mode == "PROVISIONED" ? lookup(global_secondary_index.value, "read_capacity", null) : null
       write_capacity     = var.billing_mode == "PROVISIONED" ? lookup(global_secondary_index.value, "write_capacity", null) : null
+
+      # key_schema replaces the deprecated hash_key/range_key arguments. The provider treats the same
+      # keys in either form as equal, so existing indexes are not recreated. HASH must come first.
+      dynamic "key_schema" {
+        for_each = concat(
+          [{ attribute_name = global_secondary_index.value.hash_key, key_type = "HASH" }],
+          global_secondary_index.value.range_key == null ? [] : [{ attribute_name = global_secondary_index.value.range_key, key_type = "RANGE" }]
+        )
+
+        content {
+          attribute_name = key_schema.value.attribute_name
+          key_type       = key_schema.value.key_type
+        }
+      }
 
       dynamic "on_demand_throughput" {
         for_each = lookup(global_secondary_index.value, "on_demand_throughput", null) != null ? [global_secondary_index.value.on_demand_throughput] : []
