@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1](https://github.com/schubergphilis-ep/terraform-aws-mcaf-dynamodb/compare/v0.4.0...v0.4.1) (2026-10-21)
+
+
+### 🐛 Fixes
+
+* use key_schema for global secondary indexes ([#2](https://github.com/schubergphilis-ep/terraform-aws-mcaf-dynamodb/issues/2)) ([9b88c86](https://github.com/schubergphilis-ep/terraform-aws-mcaf-dynamodb/commit/9b88c86bf7b52ae5ec5f287d3b66c9e7fca039ac))
+
 ## [0.4.0](https://github.com/schubergphilis-ep/terraform-aws-mcaf-dynamodb/compare/v0.3.0...v0.4.0) (2026-02-10)
 
 
@@ -36,4 +43,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🚀 Features
 
 * enhancement: Initial commit ([#1](https://github.com/schubergphilis/terraform-aws-mcaf-dynamodb/pull/1)) ([e8fec1f](https://github.com/schubergphilis-ep/terraform-aws-mcaf-dynamodb/commit/e8fec1f6342c7d475e3a5ba926b587972470e215))
-
